@@ -1,11 +1,16 @@
 import streamlit as st
 import base64
+import pandas as pd
+import numpy as np
+import io
+import json
+
 st.set_page_config(page_title="SmartKYC", page_icon="📖", layout="wide")
 st.header("SmartKYC")
 
 
 st.session_state.default_input = False
-global_selected_file = None
+# st.session_state.selected_file = None
 # def clear_submit():
 #     st.session_state["submit"] = False
 # @st.cache_data
@@ -22,7 +27,7 @@ def displayPDF(selected_file):
     base64_pdf = base64.b64encode(bytes_data).decode('utf-8')
 
     # Embed PDF in HTML
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="650" height="500" type="application/pdf"></iframe>'
+    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="650" height="200" type="application/pdf"></iframe>'
 
     # Display file
     st.markdown(pdf_display, unsafe_allow_html=True)
@@ -31,7 +36,7 @@ def displayPDF(selected_file):
 def displayChat(selected_file):
     start_sequence = "\nYou: "
     restart_sequence = "\nBot: "
-#     st.session_state.default_input = "Say something"
+    st.session_state.default_input = "Say something"
     
 #     if user_input:
 #         st.write("User said:" + user_input)
@@ -47,23 +52,46 @@ def displayChat(selected_file):
 
 #     if uploaded_file and question and openai_api_key:
 #         st.info("Answer")
+def displayGrid():
+    buffer = io.BytesIO()
+    with open('code/res.json') as f:
+        data = json.load(f)
+
+    # Use pd.json_normalize to convert the JSON to a DataFrame
+    df = pd.json_normalize(data['data'], 
+                         meta=['Legal Name', ['Physical Address'], ['Ticker'], ['Exchange'], ['Market Value'],['IRS No.']])
+
+# Rename the columns for clarity
+# df.columns = ['Title', 'Author_First_Name', 'Author_Last_Name', 'Publisher_Name', 'Publisher_Location']
+
+# Display the DataFrame
+# print(df)
+#     df = pd.DataFrame(np.random.randn(10, 5), columns=("col %d" % i for i in range(5)))
+#     st.download_button(label="Click to Download Template File",data=df,
+#                             file_name="template.xlsx",
+#                             mime='application/octet-stream')
+    st.table(df)
     
 col1, col2 = st.columns(spec=[2, 1], gap="small")
 
 # @st.cache_data
 def handle_fileclick(file):
-    global global_selected_file
-    global_selected_file = file
-    print("g_s_f after click:" + global_selected_file.name)
+    st.session_state.selected_file = file
+    print("g_s_f after click:" + st.session_state.selected_file.name)
 #     getDataResponse(selected_file.getvalue())
+# call method here to get data
     with col1:
         displayPDF(file)
+        displayGrid()
         
     with col2:
         displayChat(file)
             
 def main():
     with st.sidebar: 
+        doc_type = st.radio("Document Type",["10K","ADV","Fund Prospectus"])
+        if doc_type:
+            st.session_state.doc_type = doc_type
         uploaded_files = st.file_uploader(
             "Choose a PDF file", type=["pdf"],accept_multiple_files=True, 
             help="Only PDF files are supported")
@@ -77,10 +105,10 @@ def main():
                 btn_key += 1
 
     user_input = st.chat_input(disabled= st.session_state.default_input)
-
-    if user_input:
-        print("selected file in user input:"+global_selected_file.name)
-        displayPDF(global_selected_file)
+    if "selected_file" in st.session_state:
+        if user_input:
+            print("selected file in user input:"+st.session_state.selected_file.name)
+            displayPDF(st.session_state.selected_file)
         
 if __name__ == '__main__':
     main()
